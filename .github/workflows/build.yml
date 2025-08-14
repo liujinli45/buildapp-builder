@@ -1,0 +1,42 @@
+name: Build buildapp
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install SBCL
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y sbcl
+
+    - name: Build buildapp
+      run: |
+        sbcl --non-interactive \
+             --load buildapp.lisp \
+             --eval '(sb-ext:save-lisp-and-die "buildapp" :toplevel (lambda () (uiop:run-program (uiop:command-line-arguments)) :toplevel :executable t))'
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: buildapp
+        path: buildapp
+
+    - name: Create Release
+      if: github.ref == 'refs/heads/main'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        VERSION="1.5.10"
+        TAG="v$VERSION"
+        gh release create "$TAG" \
+          --title "buildapp $VERSION" \
+          --notes "Automatically built by GitHub Actions" \
+          buildapp
